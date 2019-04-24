@@ -120,57 +120,71 @@ int main(int argc, char **argv)
 
 //    std::cout << argv[1] << std::endl;
 //    std::string file_name(argv[1]);
-    Debugger debugger("/home/kang/src/EDB/test_demo/dummy");
+    Debugger debugger("/home/kang/src/EDB/test_demo/sheep");
 
     int status = debugger.trace();
-    cout << "----start trace----" << endl;
+    cout << "****start trace****" << endl;
 
 
     if (C_OK == debugger.setBreakPointInFunc("main")) //set bp in main func
-        cout << "set tempory break in main function" << endl;
+        cout << "**set tempory break in main function**" << endl;
     else
         cout << "can't set tempory break in main function" << endl;
-    debugger.printBreakPointList();
-    cout << "---print--" << endl;
+//    debugger.printBreakPointList();
+//    cout << "---print--" << endl;
     debugger.run();
     status = debugger.waitTracee();
     debugger.cancelAllBreakPoint();
     long rip = debugger.examRegister("RIP");
     debugger.modifyRegister("RIP", rip - 1);
     while (WIFSTOPPED(status)) {
-
-        printf("RIP->%lx\n", debugger.examRegister("RIP"));
+//
+//        printf("RIP->%lx\n", debugger.examRegister("RIP"));
         debugger.printSourceLine();
-        string cmd;
+        string line;
+        string s = " ";
+        vector<string> cmd;
         cout << "edb>";
-        cin >> cmd;
+        getline(cin, line);
+        split(line, s, cmd);
 
 
-        if (cmd == "step") {
+        if (cmd[0] == "step") {
             status = debugger.stepInto();
 
-        } else if (cmd == "finish")
+        } else if (cmd[0] == "finish")
             status = debugger.stepOut();
-        else if (cmd == "next")
+        else if (cmd[0] == "next")
             debugger.run();
-        else if(cmd == "bp")
-            debugger.setBreakPointInLine(4);
-        else if(cmd == "run") {
+        else if(cmd[0] == "set" && cmd[1] == "breakpoint") {
+            int line_num = atoi(cmd[2].c_str());
+            if (C_OK == debugger.setBreakPointInLine(line_num))
+                printf("**set breakpoint in Line:%d**\n", line_num);
+        } else if(cmd[0] == "run") {
             debugger.run();
             status = debugger.waitTracee();
-        } else if (cmd == "print")
+        } else if (cmd[0] == "print" && cmd[1] == "breakpoint")
             debugger.printBreakPointList();
-        else if (cmd == "rip")
-            printf("RIP---->%lx\n", debugger.examRegister("RIP"));
-        else if (cmd == "ra")
-            printf("return address %lx\n", debugger.examMemory(8 +debugger.examRegister("RBP")));
-        else
+        else if (cmd[0] == "print" && cmd[1] == "register")
+            printf("**Register %s:%ld**\n", cmd[2].c_str(), debugger.examRegister(cmd[2]));
+        else if (cmd[0] == "print" && cmd[1] == "memory") {
+            long address = atol(cmd[2].c_str());
+            printf("**Memory address :%ld value:%ld**\n", address, debugger.examMemory(address));
+        } else if (cmd[0] == "backtrace") {
+            debugger.backtrace();
+        } else if (cmd[0] == "set" && cmd[1] == "memory") {
+            long address = atol(cmd[2].c_str());
+            int value = atoi(cmd[3].c_str());
+            debugger.modifyMemory(address, value);
+        } else if (cmd[0] == "la") {
+            debugger.printLineAddress();
+        } else
             cout << "wrong command" << endl;
 
         if (WIFEXITED(status))
             break;
     }
-    cout << "trace is over" << endl;
+    cout << "****trace is over****" << endl;
     debugger.detach();
 
 

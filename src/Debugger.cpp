@@ -74,7 +74,7 @@ Debugger::Debugger(const std::string &file_name) {
 
 }
 long Debugger::init() {
-    std::cout << "init" << fd << std::endl;
+//    std::cout << "init" << fd << std::endl;
     try {
 
         elf_file = elf::elf(elf::create_mmap_loader(fd));
@@ -100,9 +100,9 @@ long Debugger::init() {
             line_address_set.insert(line.address);
         }
     }
-    std::cout << "list line address" << std::endl;
-    for (auto i : line_address)
-        printf("Line:%d, address:%lx\n", i.first, i.second);
+//    std::cout << "list line address" << std::endl;
+//    for (auto i : line_address)
+//        printf("Line:%d, address:%lx\n", i.first, i.second);
     return C_OK;
 
 }
@@ -116,7 +116,7 @@ int Debugger::trace() {
                 perror("trace me");
             execl(file_name.c_str(), file_name.c_str(), NULL);
         } else {
-            std::cout << "tracee pid " << pid << "filename " << file_name.c_str() << std::endl;
+//            std::cout << "tracee pid " << pid << "filename " << file_name.c_str() << std::endl;
             int status;
             waitpid(pid, &status, 0);
             return status;
@@ -136,7 +136,7 @@ void Debugger::checkBreakPoint() {
         if (line_address[i.first] + 1 == rip) {
             rip--;
             modifyRegister("RIP", rip);
-            printf("now run from breakpoint(rip--)\n");
+//            printf("now run from breakpoint(rip--)\n");
             // todo:这里把指令0xCC拿走，但这样取消就相当于取消断点
             long now_ins = examMemory(rip);
             *(char *)&now_ins = i.second;
@@ -159,7 +159,7 @@ int Debugger::stepInto() {
         status = waitTracee();
         rip = examRegister("RIP");
 
-        printSourceLine();
+//        printSourceLine();
 
     } while (line_address_set.find(rip) == line_address_set.end());
     return status;
@@ -176,6 +176,8 @@ int Debugger::stepOut() {
     run();
     int status = waitTracee();
     modifyMemory(return_address, old_ins);
+    long rip = examRegister("RIP");
+    modifyRegister("RIP", rip - 1);
     return status;
 }
 long Debugger::setBreakPointInLine(int line_num) {
@@ -449,7 +451,12 @@ long Debugger::attach(int pid) {
 
 }
 
-
+void Debugger::printLineAddress() {
+    printf("****printLineAddress****\n");
+    for (auto &i : line_address) {
+        printf("line %d : address %lx\n", i.first, i.second);
+    }
+}
 void Debugger::printSourceLine() {
     long rip = examRegister("RIP");
     if (line_address_set.find(rip) != line_address_set.end())

@@ -165,9 +165,11 @@ public:
     void detach();
     long attach(int pid);
     void cancelAllBreakPoint();
-
-//    dwarf::die getFunctionDie(long pc);
     void printSourceLine();
+
+    //for test
+    void printLineAddress();
+//    dwarf::die getFunctionDie(long pc);
 
     //test
     bool isDwarfFile();
