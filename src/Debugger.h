@@ -16,13 +16,19 @@
 #include <sstream>
 #include <sys/wait.h>
 #include <iostream>
+#include <memory>
+#include <algorithm>
+#include <sys/user.h>
+#include <libunwind.h>
+#include <libunwind-x86_64.h>
+#include <libunwind-ptrace.h>
+#include <set>
 
 const int C_OK = 0;
 const int C_ERR = -1;
 const char INT_ins = (char)0xcc;
 const int NOT_ATTACH = -1;
 class Debugger;
-static void testTrace(Debugger &debugger);
 
 static std::map<int, std::string> x64_regs {
         {0, "R15"},
@@ -83,6 +89,53 @@ static std::map<std::string, int> x64_regs_num {
         {"FS", 25},
         {"GS", 26}
 };
+enum class reg {
+    rax, rbx, rcx, rdx,
+    rdi, rsi, rbp, rsp,
+    r8,  r9,  r10, r11,
+    r12, r13, r14, r15,
+    rip, rflags,    cs,
+    orig_rax, fs_base,
+    gs_base,
+    fs, gs, ss, ds, es
+};
+
+static constexpr std::size_t n_registers = 27;
+
+struct reg_descriptor {
+    reg r;
+    int dwarf_r;
+    std::string name;
+};
+static const std::array<reg_descriptor, n_registers> register_descriptors {{
+     { reg::r15, 15, "r15" },
+     { reg::r14, 14, "r14" },
+     { reg::r13, 13, "r13" },
+     { reg::r12, 12, "r12" },
+     { reg::rbp, 6, "rbp" },
+     { reg::rbx, 3, "rbx" },
+     { reg::r11, 11, "r11" },
+     { reg::r10, 10, "r10" },
+     { reg::r9, 9, "r9" },
+     { reg::r8, 8, "r8" },
+     { reg::rax, 0, "rax" },
+     { reg::rcx, 2, "rcx" },
+     { reg::rdx, 1, "rdx" },
+     { reg::rsi, 4, "rsi" },
+     { reg::rdi, 5, "rdi" },
+     { reg::orig_rax, -1, "orig_rax" },
+     { reg::rip, -1, "rip" },
+     { reg::cs, 51, "cs" },
+     { reg::rflags, 49, "eflags" },
+     { reg::rsp, 7, "rsp" },
+     { reg::ss, 52, "ss" },
+     { reg::fs_base, 58, "fs_base" },
+     { reg::gs_base, 59, "gs_base" },
+     { reg::ds, 53, "ds" },
+     { reg::es, 50, "es" },
+     { reg::fs, 54, "fs" },
+     { reg::gs, 55, "gs" },
+    }};
 class Debugger {
 public:
     Debugger(int pid);
@@ -92,29 +145,48 @@ public:
     long examVariable(std::string name);
     long modifyVariable(std::string name, long value);
     std::vector<long> examMemory(long address, long size);
-    long modifyMemory(long address, std::string value);
-    long setBreakPointInLine(long line_num);
-    long cancelBreakPointInLine(long line_num);
+
+    long examMemory(long address);
+    long modifyMemory(long address, long value);
+    long setBreakPointInLine(int line_num);
+    long cancelBreakPointInLine(int line_num);
+    long setBreakPointInFunc(std::string func_name);
+    long cancelBreakPointInFunc(std::string func_name);
+    long setBreakPointInStart();
     void backtrace();
     long examRegister(const std::string &reg);
     long modifyRegister(std::string reg, long value);
-    void singleStep();
+    int stepInto();
+    int stepOver();
+    int stepOut();
     void run();
-    long trace();
+    int trace();
     int waitTracee();
+    void detach();
+    long attach(int pid);
+    void cancelAllBreakPoint();
 
+//    dwarf::die getFunctionDie(long pc);
+    void printSourceLine();
+
+    //test
+    bool isDwarfFile();
+    void printBreakPointList();
 
 
 private:
     long init();
+    long getFuncAddress(std::string func_name);
+    void checkBreakPoint();
     pid_t pid;
     std::string file_name;
     int fd;
     std::map<int, long> line_address;
     elf::elf elf_file;
     dwarf::dwarf dwarf_file;
-    std::vector<std::pair<long, char>> breakpoint_list;
-
+    std::vector<std::pair<int, char>> breakpoint_list;
+    std::set<long> line_address_set;
+    std::map<long, int> address_line;
 
 };
 

@@ -10,6 +10,7 @@
 #include <sys/wait.h>
 #include <cstdlib>
 #include "Debugger.h"
+
 using namespace std;
 void split(std::string& s, std::string& c,std::vector< std::string >& v)
 {
@@ -58,38 +59,38 @@ static struct config {
    int pid;
 
 } config;
-static int parseOptions(int argc, char **argv) {
-
-    int i;
-    for (i = 1; i < argc; i++) {
-        int lastarg = i==argc-1;
-        if (!strcmp(argv[i], "-p") && !lastarg) {
-            config.pid = atoi(argv[++i]);
-
-        } else if (!strcmp(argv[i],"-h") || !strcmp(argv[i], "--version")) {
-            char *useage = getUseage();
-            printf("useage:\n%s\n", useage);
-            exit(0);
-        } else if (!strcmp(argv[i],"-v") || !strcmp(argv[i], "--version")) {
-            char *version = getVersion();
-            printf("EDB %s\n", version);
-            exit(0);
-        } else {
-            if (argv[i][0] == '-') {
-                fprintf(stderr,
-                        "Unrecognized option or bad number of args for: '%s'\n",
-                        argv[i]);
-                exit(1);
-            } else {
-                /* Likely the command name, stop here. */
-                break;
-            }
-        }
-    }
-
-
-    return i;
-}
+//static int parseOptions(int argc, char **argv) {
+//
+//    int i;
+//    for (i = 1; i < argc; i++) {
+//        int lastarg = i==argc-1;
+//        if (!strcmp(argv[i], "-p") && !lastarg) {
+//            config.pid = atoi(argv[++i]);
+//
+//        } else if (!strcmp(argv[i],"-h") || !strcmp(argv[i], "--version")) {
+//            char *useage = getUseage();
+//            printf("useage:\n%s\n", useage);
+//            exit(0);
+//        } else if (!strcmp(argv[i],"-v") || !strcmp(argv[i], "--version")) {
+//            char *version = getVersion();
+//            printf("EDB %s\n", version);
+//            exit(0);
+//        } else {
+//            if (argv[i][0] == '-') {
+//                fprintf(stderr,
+//                        "Unrecognized option or bad number of args for: '%s'\n",
+//                        argv[i]);
+//                exit(1);
+//            } else {
+//                /* Likely the command name, stop here. */
+//                break;
+//            }
+//        }
+//    }
+//
+//
+//    return i;
+//}
 //static void testTrace(Debugger &debugger)
 //{
 //    pid_t pid = fork();
@@ -111,75 +112,67 @@ static int parseOptions(int argc, char **argv) {
 //        std::cout << "wait status " << status << std::endl;
 //    }
 //}
+
 int main(int argc, char **argv)
 {
 
- //   Debugger debugger("/home/kang/src/EDB/test_demo/dummy");
-    std::cout << argv[1] << std::endl;
-    std::string file_name(argv[1]);
-    Debugger debugger(file_name);
 
-    debugger.trace();
-//    testTrace(debugger);
-//    long address = 4198831;
-//    std::cout << "Exam Memory before" << address << std::endl;
-//    vector<long> v = debugger.examMemory(address, 8);
-//    for (auto i : v)
-//        printf("%lx ", i);
-//    printf("\n");
-    debugger.setBreakPointInLine(18);
-    debugger.setBreakPointInLine(17);
-    debugger.cancelBreakPointInLine(18);
-    debugger.run();
-    debugger.waitTracee();
-    std::string reg = "RIP";
-    printf("RIP %lx \n", debugger.examRegister(reg));
-//    debugger.cancelBreakPointInLine(17);
-//    std::cout << "Exam Memory after" << address << std::endl;
-//    vector<long> vec = debugger.examMemory(address, 8);
-//    for (auto i : vec)
-//        printf("%lx ", i);
-//    printf("\n");
-    debugger.run();
-    debugger.waitTracee();
 
+//    std::cout << argv[1] << std::endl;
+//    std::string file_name(argv[1]);
+    Debugger debugger("/home/kang/src/EDB/test_demo/dummy");
+
+    int status = debugger.trace();
+    cout << "----start trace----" << endl;
+
+
+    if (C_OK == debugger.setBreakPointInFunc("main")) //set bp in main func
+        cout << "set tempory break in main function" << endl;
+    else
+        cout << "can't set tempory break in main function" << endl;
+    debugger.printBreakPointList();
+    cout << "---print--" << endl;
+    debugger.run();
+    status = debugger.waitTracee();
+    debugger.cancelAllBreakPoint();
+    long rip = debugger.examRegister("RIP");
+    debugger.modifyRegister("RIP", rip - 1);
+    while (WIFSTOPPED(status)) {
+
+        printf("RIP->%lx\n", debugger.examRegister("RIP"));
+        debugger.printSourceLine();
+        string cmd;
+        cout << "edb>";
+        cin >> cmd;
+
+
+        if (cmd == "step") {
+            status = debugger.stepInto();
+
+        } else if (cmd == "finish")
+            status = debugger.stepOut();
+        else if (cmd == "next")
+            debugger.run();
+        else if(cmd == "bp")
+            debugger.setBreakPointInLine(4);
+        else if(cmd == "run") {
+            debugger.run();
+            status = debugger.waitTracee();
+        } else if (cmd == "print")
+            debugger.printBreakPointList();
+        else if (cmd == "rip")
+            printf("RIP---->%lx\n", debugger.examRegister("RIP"));
+        else if (cmd == "ra")
+            printf("return address %lx\n", debugger.examMemory(8 +debugger.examRegister("RBP")));
+        else
+            cout << "wrong command" << endl;
+
+        if (WIFEXITED(status))
+            break;
+    }
+    cout << "trace is over" << endl;
+    debugger.detach();
+
+
+    return 0;
 }
-
-//int main(int argc, char **argv) {
-//    char *line;
-//    char *prgname = argv[0];
-//
-//    parseOptions(argc, argv);
-//
-//    /* Set the completion callback. This will be called every time the
-//     * user uses the <tab> key. */
-//    linenoiseSetCompletionCallback(completion);
-//    linenoiseSetHintsCallback(hints);
-//
-//    /* Load history from file. The history file is just a plain text file
-//     * where entries are separated by newlines. */
-//    linenoiseHistoryLoad("history.txt"); /* Load the history at startup */
-//
-//    /* Now this is the main loop of the typical linenoise-based application.
-//     * The call to linenoise() will block as long as the user types something
-//     * and presses enter.
-//     *
-//     * The typed string is returned as a malloc() allocated string by
-//     * linenoise, so the user needs to free() it. */
-//    while((line = linenoise("edb> ")) != NULL) {
-//        /* Do something with the string. */
-//        if (line[0] != '\0' && line[0] != '/') {
-//            printf("echo: '%s'\n", line);
-//            linenoiseHistoryAdd(line); /* Add to the history. */
-//            linenoiseHistorySave("history.txt"); /* Save the history on disk. */
-//        } else if (!strncmp(line,"/historylen",11)) {
-//            /* The "/historylen" command will change the history len. */
-//            int len = atoi(line+11);
-//            linenoiseHistorySetMaxLen(len);
-//        } else if (line[0] == '/') {
-//            printf("Unreconized command: %s\n", line);
-//        }
-//        free(line);
-//    }
-//    return 0;
-//}
