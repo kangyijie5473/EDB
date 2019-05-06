@@ -107,7 +107,7 @@ struct reg_descriptor {
     int dwarf_r;
     std::string name;
 };
-static const std::array<reg_descriptor, n_registers> register_descriptors {{
+static const std::array<reg_descriptor, n_registers> g_register_descriptors {{
      { reg::r15, 15, "r15" },
      { reg::r14, 14, "r14" },
      { reg::r13, 13, "r13" },
@@ -142,8 +142,8 @@ public:
     Debugger(const std::string &file_name);
     Debugger() = default;
 
-    long examVariable(std::string name);
-    long modifyVariable(std::string name, long value);
+    long examVariable(const std::string &name);
+    long modifyVariable(const std::string &name, long value);
     std::vector<long> examMemory(long address, long size);
 
     long examMemory(long address);
@@ -166,15 +166,12 @@ public:
     long attach(int pid);
     void cancelAllBreakPoint();
     void printSourceLine();
-
     //for test
     void printLineAddress();
-//    dwarf::die getFunctionDie(long pc);
-
+    dwarf::die getFunctionDie();
     //test
     bool isDwarfFile();
     void printBreakPointList();
-
 
 private:
     long init();
@@ -189,7 +186,6 @@ private:
     std::vector<std::pair<int, char>> breakpoint_list;
     std::set<long> line_address_set;
     std::map<long, int> address_line;
-
 };
 
 

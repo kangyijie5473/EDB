@@ -3,7 +3,7 @@
 //
 
 #include "Debugger.h"
-static std::string getSring(int n)
+static std::string getString(int n)
 {
     std::stringstream newstr;
     newstr << n;
@@ -59,7 +59,7 @@ long Debugger::examMemory(long address) {
 }
 
 
-Debugger::Debugger(int pid) {
+Debugger::Debugger(int pid):pid(NOT_ATTACH) {
     attach(pid);
 }
 Debugger::Debugger(const std::string &file_name) {
@@ -70,6 +70,7 @@ Debugger::Debugger(const std::string &file_name) {
         perror("Open");
     else {
         init();
+        //test();
     }
 
 }
@@ -77,32 +78,27 @@ long Debugger::init() {
 //    std::cout << "init" << fd << std::endl;
     try {
 
-        elf_file = elf::elf(elf::create_mmap_loader(fd));
+        elf_file = elf::elf{elf::create_mmap_loader(fd)};
         std::shared_ptr<dwarf::loader> p = dwarf::elf::create_loader(elf_file);
         size_t size;
         if (p->load(dwarf::section_type::info, &size) == nullptr){
             std::cout << "no .debug_info" << std::endl;
             return C_ERR;
         }
-
-
-        dwarf_file = dwarf::dwarf(p);
     } catch (std::exception &e) {
         std::cerr << e.what() ;
     }
 
 
-
-    for (auto cu : dwarf_file.compilation_units()) {
+    //千万要用引用
+    for (auto &cu : dwarf_file.compilation_units()) {
         for (auto &line : cu.get_line_table()) {
             line_address.insert(std::make_pair(line.line, line.address));
             address_line.insert(std::make_pair(line.address, line.line));
             line_address_set.insert(line.address);
         }
     }
-//    std::cout << "list line address" << std::endl;
-//    for (auto i : line_address)
-//        printf("Line:%d, address:%lx\n", i.first, i.second);
+
     return C_OK;
 
 }
@@ -224,7 +220,6 @@ long Debugger::getFuncAddress(std::string func_name) {
     for (auto &sec : elf_file.sections()) {
         if (sec.get_hdr().type != elf::sht::symtab && sec.get_hdr().type != elf::sht::dynsym)
             continue;
-        int i = 0;
         for (auto sym : sec.as_symtab()) {
             auto &d = sym.get_data();
             if (d.type() == elf::stt::func && sym.get_name() == func_name) {
@@ -316,102 +311,114 @@ void Debugger::backtrace() {
 
     _UPT_destroy(ui);
 }
-//uint64_t get_register_value(pid_t pid, reg r) {
-//    user_regs_struct regs;
-//    ptrace(PTRACE_GETREGS, pid, nullptr, &regs);
-//    auto it = std::find_if(begin(register_descriptors), end(register_descriptors),
-//                           [r](auto&& rd) { return rd.r == r; });
-//
-//    return *(reinterpret_cast<uint64_t*>(&regs) + (it - begin(register_descriptors)));
-//}
-//uint64_t get_register_value_from_dwarf_register (pid_t pid, unsigned regnum) {
-//    auto it = std::find_if(begin(register_descriptors), end(register_descriptors),
-//                           [regnum](auto&& rd) { return rd.dwarf_r == regnum; });
-//    if (it == end(register_descriptors)) {
-//        throw std::out_of_range{"Unknown dwarf register"};
-//    }
-//
-//    return get_register_value(pid, it->r);
-//}
-//class ptrace_expr_context : public dwarf::expr_context {
-//public:
-//    ptrace_expr_context (pid_t pid) : pid{pid} {}
-//
-//    dwarf::taddr reg (unsigned regnum) override {
-//        return get_register_value_from_dwarf_register(pid, regnum);
-//    }
-//
-//    dwarf::taddr pc() override {
-//        return ptrace(PTRACE_PEEKUSER, pid, 8 * 16, NULL);
-//    }
-//
-//    dwarf::taddr deref_size (dwarf::taddr address, unsigned size) override {
-//        //TODO take into account size
-//        return ptrace(PTRACE_PEEKDATA, pid, address, nullptr);
-//    }
-//
-//private:
-//    pid_t pid;
-//};
-//
-//
-//long Debugger::examVariable(std::string name) {
-//    using namespace dwarf;
-//    die func = getFunctionDie(examRegister("RIP"));
-//
-//    for (const auto& die : func) {
-//        if (die.tag == DW_TAG::variable) {
-//            auto loc_val = die[DW_AT::location];
-//
-//            //only supports exprlocs for now
-//            if (loc_val.get_type() == value::type::exprloc) {
-//                ptrace_expr_context context {pid};
-//                auto result = loc_val.as_exprloc().evaluate(&context);
-//
-//                switch (result.location_type) {
-//                    case expr_result::type::address:
-//                    {
-//                        long value = examMemory(result.value, 1)[0];
-//                        std::cout << at_name(die) << " (0x" << std::hex << result.value << ") = " << value << std::endl;
-//                        break;
-//                    }
-//
-//                    case expr_result::type::reg:
-//                    {
-//                        auto value = get_register_value_from_dwarf_register(pid, result.value);
-//                        std::cout << at_name(die) << " (reg " << result.value << ") = " << value << std::endl;
-//                        break;
-//                    }
-//
-//                    default:
-//                        throw std::runtime_error{"Unhandled variable location"};
-//                }
-//            }
-//            else {
-//                throw std::runtime_error{"Unhandled variable location"};
-//            }
-//        }
-//    }
-//    return C_OK;
-//}
-//long Debugger::modifyVariable(std::string name, long value) {
-//    return C_OK;
-//}
-//dwarf::die Debugger::getFunctionDie(long pc) {
-//    for (auto &cu : dwarf_file.compilation_units()) {
-//        if (die_pc_range(cu.root()).contains(pc)) {
-//            for (const auto& die : cu.root()) {
-//                if (die.tag == dwarf::DW_TAG::subprogram) {
-//                    if (dwarf::die_pc_range(die).contains(pc)) {
-//                        return die;
-//                    }
-//                }
-//            }
-//        }
-//    }
-//
-//    throw std::out_of_range{"Cannot find function"};
-//}
+
+//查看修改变量相关代码参考minidbg
+uint64_t get_register_value(pid_t pid, reg r) {
+    user_regs_struct regs;
+    ptrace(PTRACE_GETREGS, pid, nullptr, &regs);
+    auto it = std::find_if(begin(g_register_descriptors), end(g_register_descriptors),
+                           [r](auto&& rd) { return rd.r == r; });
+
+    return *(reinterpret_cast<uint64_t*>(&regs) + (it - begin(g_register_descriptors)));
+}
+uint64_t get_register_value_from_dwarf_register (pid_t pid, unsigned regnum) {
+    auto it = std::find_if(begin(g_register_descriptors), end(g_register_descriptors),
+                           [regnum](auto&& rd) { return rd.dwarf_r == regnum; });
+    if (it == end(g_register_descriptors)) {
+        throw std::out_of_range{"Unknown dwarf register"};
+    }
+
+    return get_register_value(pid, it->r);
+}
+class ptrace_expr_context : public dwarf::expr_context {
+public:
+    ptrace_expr_context (pid_t pid) : m_pid{pid} {}
+
+    dwarf::taddr reg (unsigned regnum) override {
+        return get_register_value_from_dwarf_register(m_pid, regnum);
+    }
+
+    dwarf::taddr pc() override {
+        struct user_regs_struct regs;
+        ptrace(PTRACE_GETREGS, m_pid, nullptr, &regs);
+        return regs.rip;
+    }
+
+    dwarf::taddr deref_size (dwarf::taddr address, unsigned size) override {
+        //TODO take into account size
+        return ptrace(PTRACE_PEEKDATA, m_pid, address, nullptr);
+    }
+
+private:
+    pid_t m_pid;
+};
+dwarf::die Debugger::getFunctionDie() {
+    long pc = examRegister("RIP");
+//    printf("PC:%lx\n", pc);
+//    printf("dwarf_file %ld unit\n", dwarf_file.compilation_units().size());
+
+    for (auto &cu : dwarf_file.compilation_units()) {
+
+        if (die_pc_range(cu.root()).contains(pc)) {
+            for (const auto& die : cu.root()) {
+                if (die.tag == dwarf::DW_TAG::subprogram) {
+                    if (die_pc_range(die).contains(pc)) {
+                        return die;
+                    }
+                }
+            }
+        }
+    }
+
+    throw std::out_of_range{"Cannot find function"};
+}
+
+
+long Debugger::modifyVariable(const std::string &name, long value) {
+    return C_OK;
+}
+long Debugger::examVariable(const std::string &name) {
+    using namespace dwarf;
+
+    die func = getFunctionDie();
+
+    for (const auto& die : func) {
+
+        if (die.tag == DW_TAG::variable && at_name(die) == name) {
+            auto loc_val = die[DW_AT::location];
+
+            //only supports exprlocs for now
+            if (loc_val.get_type() == value::type::exprloc ) {
+                ptrace_expr_context context {pid};
+                auto result = loc_val.as_exprloc().evaluate(&context);
+
+                switch (result.location_type) {
+                    case expr_result::type::address:
+                    {
+                        auto value = examMemory(result.value);
+                        std::cout << at_name(die) << " (0x" << std::hex << result.value << ") = " << value << std::endl;
+                        break;
+                    }
+
+                    case expr_result::type::reg:
+                    {
+                        auto value = get_register_value_from_dwarf_register(pid, result.value);
+                        std::cout << at_name(die) << " (reg " << result.value << ") = " << value << std::endl;
+                        break;
+                    }
+
+                    default:
+                        throw std::runtime_error{"Unhandled variable location"};
+                }
+            } else {
+                throw std::runtime_error{"Unhandled variable location"};
+            }
+            return C_OK;
+        }
+    }
+    return C_ERR;
+}
+
 void Debugger::cancelAllBreakPoint() {
     for (auto i : breakpoint_list) {
         long now_ins = ptrace(PTRACE_PEEKTEXT, pid, line_address[i.first], NULL);
@@ -432,12 +439,12 @@ void Debugger::detach() {
 
 }
 long Debugger::attach(int pid) {
-    if (pid != NOT_ATTACH) {
+    if (this->pid != NOT_ATTACH) {
         printf("Now is attach process. PID is %d\n", this->pid);
         return C_ERR;
     } else {
         this->pid = pid;
-        std::string str = getSring(pid);
+        std::string str = getString(pid);
         file_name = "/proc/" + str + "/exe";
         this->fd = open(file_name.c_str(), O_RDONLY);
         if (fd == -1){
@@ -481,3 +488,4 @@ bool Debugger::isDwarfFile() {
     else
         return true;
 }
+

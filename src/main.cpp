@@ -118,20 +118,18 @@ int main(int argc, char **argv)
 
 
 
-//    std::cout << argv[1] << std::endl;
-//    std::string file_name(argv[1]);
-    Debugger debugger("/home/kang/src/EDB/test_demo/sheep");
+    std::cout << argv[1] << std::endl;
+    std::string file_name(argv[1]);
+//    int pid = atoi(argv[1]);
+    Debugger debugger(file_name);
 
     int status = debugger.trace();
     cout << "****start trace****" << endl;
-
 
     if (C_OK == debugger.setBreakPointInFunc("main")) //set bp in main func
         cout << "**set tempory break in main function**" << endl;
     else
         cout << "can't set tempory break in main function" << endl;
-//    debugger.printBreakPointList();
-//    cout << "---print--" << endl;
     debugger.run();
     status = debugger.waitTracee();
     debugger.cancelAllBreakPoint();
@@ -178,6 +176,10 @@ int main(int argc, char **argv)
             debugger.modifyMemory(address, value);
         } else if (cmd[0] == "la") {
             debugger.printLineAddress();
+        } else if(cmd[0] == "print" && cmd[1] == "var") {
+            debugger.examVariable(cmd[2]);
+        } else if(cmd[0] == "test") {
+            ;
         } else
             cout << "wrong command" << endl;
 
