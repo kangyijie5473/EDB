@@ -85,6 +85,7 @@ long Debugger::init() {
             std::cout << "no .debug_info" << std::endl;
             return C_ERR;
         }
+        dwarf_file = dwarf::dwarf(p);
     } catch (std::exception &e) {
         std::cerr << e.what() ;
     }
@@ -396,7 +397,7 @@ long Debugger::examVariable(const std::string &name) {
                     case expr_result::type::address:
                     {
                         auto value = examMemory(result.value);
-                        std::cout << at_name(die) << " (0x" << std::hex << result.value << ") = " << value << std::endl;
+                        std::cout << at_name(die) << " (0x" << std::hex << result.value << ") = 0x" << std::hex << value << std::endl;
                         break;
                     }
 
