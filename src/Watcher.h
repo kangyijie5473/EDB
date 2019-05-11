@@ -6,17 +6,17 @@
 #define SRC_WATCHER_H
 
 #include <unistd.h>
-#include <string>
+#include <sys/user.h>
 #include <fcntl.h>
 #include <dirent.h>
+#include <string>
 #include <cstring>
 #include <iostream>
 #include <sstream>
+#include <fstream>
 #include <vector>
 
-const int NO_ATTACH = -1;
-const int C_ERR = -1;
-const int C_OK = 0;
+
 static std::string getString(int n)
 {
     std::stringstream newstr;
@@ -36,27 +36,13 @@ public:
     void getUsedMem();
     void getIoInfo();
     void getThreadsID();
-    void getProcessTree();
 private:
     pid_t pid;
     std::string file_path;
 };
-static void split(std::string& s, std::string& c, std::vector< std::string >& v)
-{
-    std::string::size_type pos1, pos2;
-    size_t len = s.length();
-    pos2 = s.find(c);
-    pos1 = 0;
-    while(std::string::npos != pos2)
-    {
-        v.emplace_back(s.substr(pos1, pos2-pos1));
 
-        pos1 = pos2 + c.size();
-        pos2 = s.find(c, pos1);
-    }
-    if(pos1 != len)
-        v.emplace_back(s.substr(pos1));
-}
+extern void split(std::string& s, std::string& c, std::vector< std::string >& v);
+
 static void trimUnusedSpace(std::string &str)
 {
     for (auto i = str.begin(); i != str.end(); ) {

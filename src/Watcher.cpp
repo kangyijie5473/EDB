@@ -2,29 +2,33 @@
 // Created by kang on 19-4-27.
 //
 
-#include <fstream>
-#include <sys/user.h>
+#include "common.h"
 #include "Watcher.h"
 
-Watcher::Watcher():pid(NO_ATTACH) {
+Watcher::Watcher():pid(NOT_ATTACH) {
 
 }
-Watcher::Watcher(int pid) :pid(NO_ATTACH){
+Watcher::Watcher(int pid) :pid(NOT_ATTACH){
     if (C_ERR == attach(pid))
-        this->pid = NO_ATTACH;
+        this->pid = NOT_ATTACH;
 }
 int Watcher::attach(int pid) {
-    if (this->pid != NO_ATTACH) {
+    if (this->pid != NOT_ATTACH) {
         return C_ERR;
     }
     file_path = "/proc/" + getString(pid);
+    this->pid = pid;
     if (-1 == access(file_path.c_str(), X_OK)) {
         perror("access");
+        file_path.clear();
+        this->pid = NOT_ATTACH;
         return C_ERR;
     }
+    return C_OK;
 }
 void Watcher::detach() {
-    pid = NO_ATTACH;
+    pid = NOT_ATTACH;
+    file_path.clear();
 }
 void Watcher::getOpenFd() {
     std::string openfd_dir = file_path + "/fd";
@@ -94,9 +98,7 @@ void Watcher::getIoInfo() {
     printf("read %ld bytes from storage, write %ld bytes from storage", real_read, real_write);
     fs.close();
 }
-void Watcher::getProcessTree() {
 
-}
 void Watcher::getThreadsID() {
     std::string threads_dir = file_path + "/task";
     DIR *dir = opendir(threads_dir.c_str());
@@ -105,7 +107,6 @@ void Watcher::getThreadsID() {
         return;
     }
     struct dirent *dp;
-    char buffer[100]= {0};
     while (true) {
         dp = readdir(dir);
         if (dp == NULL)
