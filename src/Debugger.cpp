@@ -2,7 +2,28 @@
 // Created by kang on 19-4-15.
 //
 
+#include "common.h"
 #include "Debugger.h"
+static std::string toUpper(const std::string &str)
+{
+    std::string res;
+    for (auto i : str) {
+        res.push_back(toupper(i));
+    }
+    return res;
+}
+static std::string toHexString(const std::string &str)
+{
+    std::string result;
+    return result;
+
+}
+static std::string toHexString(long value)
+{
+    std::string result;
+    return result;
+}
+
 static std::string getString(int n)
 {
     std::stringstream newstr;
@@ -11,13 +32,15 @@ static std::string getString(int n)
 }
 
 long Debugger::examRegister(const std::string &reg) {
-    long reg_value = ptrace(PTRACE_PEEKUSER, pid, 8 * x64_regs_num[reg], NULL);
+    std::string reg_name = toUpper(reg);
+    long reg_value = ptrace(PTRACE_PEEKUSER, pid, 8 * x64_regs_num[reg_name], NULL);
     if (reg_value == -1)
         perror("examRegister");
     return reg_value;
 }
 long Debugger::modifyRegister(std::string reg, long value) {
-    long ret = ptrace(PTRACE_POKEUSER, pid, 8 * x64_regs_num[reg], value);
+    std::string reg_name = toUpper(reg);
+    long ret = ptrace(PTRACE_POKEUSER, pid, 8 * x64_regs_num[reg_name], value);
     if (ret == -1) {
         perror("modifyRegister");
         return C_ERR;
@@ -58,7 +81,21 @@ long Debugger::examMemory(long address) {
         return value;
 }
 
+Debugger::Debugger(const struct config &c):pid(NOT_ATTACH) {
+    if (c.start_flag == START_PID) {
+        this->pid = c.pid;
+        attach(pid);
+    } else if (c.start_flag == START_FILENAME) {
+        this->file_name = std::string(c.file_name);
 
+        this->fd = open(file_name.c_str(), O_RDONLY);
+        if (fd == -1)
+            perror("Open");
+        else {
+            init();
+        }
+    }
+}
 Debugger::Debugger(int pid):pid(NOT_ATTACH) {
     attach(pid);
 }
@@ -302,7 +339,6 @@ void Debugger::backtrace() {
         unw_get_reg(&c, UNW_REG_IP, &pc);
         fname[0] = '\0';
         (void) unw_get_proc_name(&c, fname, sizeof(fname), &offset);
-
         printf("%p : (%s+0x%x) [%p]\n", (void *)pc,
                fname,
                (int) offset,

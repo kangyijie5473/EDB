@@ -24,10 +24,7 @@
 #include <libunwind-ptrace.h>
 #include <set>
 
-const int C_OK = 0;
-const int C_ERR = -1;
-const char INT_ins = (char)0xcc;
-const int NOT_ATTACH = -1;
+
 class Debugger;
 
 static std::map<int, std::string> x64_regs {
@@ -136,10 +133,21 @@ static const std::array<reg_descriptor, n_registers> g_register_descriptors {{
      { reg::fs, 54, "fs" },
      { reg::gs, 55, "gs" },
     }};
+const int START_PID = 1;
+const int START_FILENAME = 2;
+const int STRAT_ALONE = 3;
+static struct config {
+    int fd;          //fd
+    char *file_name;
+    int start_flag;
+    int pid;
+
+} config;
 class Debugger {
 public:
     Debugger(int pid);
     Debugger(const std::string &file_name);
+    Debugger(const struct config &c);
     Debugger() = default;
 
     long examVariable(const std::string &name);
