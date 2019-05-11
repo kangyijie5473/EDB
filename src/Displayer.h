@@ -5,12 +5,12 @@
 #ifndef SRC_DISPLAYER_H
 #define SRC_DISPLAYER_H
 
+#include <cstddef>
+#include <string.h>
+#include <linenoise.h>
 
-
-class Displayer {
-
-};
-
+void completion(const char *buf, linenoiseCompletions *lc) ;
+char *hints(const char *buf, int *color, int *bold) ;
 
 
 #endif //SRC_DISPLAYER_H

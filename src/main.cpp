@@ -1,15 +1,21 @@
-#include <iostream>
-#include <linenoise.h>
-#include <dwarf++.hh>
-#include <elf.h>
-#include <elf++.hh>
+
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/ptrace.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <iostream>
 #include <cstdlib>
+
+#include <linenoise.h>
+#include <dwarf++.hh>
+#include <elf.h>
+#include <elf++.hh>
+
+#include "common.h"
 #include "Debugger.h"
+#include "Displayer.h"
+#include "Watcher.h"
 
 using namespace std;
 void split(std::string& s, std::string& c,std::vector< std::string >& v)
@@ -29,21 +35,7 @@ void split(std::string& s, std::string& c,std::vector< std::string >& v)
         v.emplace_back(s.substr(pos1));
 }
 
-void completion(const char *buf, linenoiseCompletions *lc) {
-    if (buf[0] == 'h') {
-        linenoiseAddCompletion(lc,"hello");
-        linenoiseAddCompletion(lc,"hello there");
-    }
-}
 
-char *hints(const char *buf, int *color, int *bold) {
-    if (!strcasecmp(buf,"hello")) {
-        *color = 35;
-        *bold = 0;
-        return " World";
-    }
-    return NULL;
-}
 static char *getVersion()
 {
     return const_cast<char *>("0.1");
@@ -52,81 +44,97 @@ static char *getUseage()
 {
     return const_cast<char *>("EDB -p pid\nEDB\nEDB a.out");
 }
-static struct config {
-   int fd;          //fd
-   char *file_name;
-   char *file_path;
-   int pid;
 
-} config;
-//static int parseOptions(int argc, char **argv) {
-//
-//    int i;
-//    for (i = 1; i < argc; i++) {
-//        int lastarg = i==argc-1;
-//        if (!strcmp(argv[i], "-p") && !lastarg) {
-//            config.pid = atoi(argv[++i]);
-//
-//        } else if (!strcmp(argv[i],"-h") || !strcmp(argv[i], "--version")) {
-//            char *useage = getUseage();
-//            printf("useage:\n%s\n", useage);
-//            exit(0);
-//        } else if (!strcmp(argv[i],"-v") || !strcmp(argv[i], "--version")) {
-//            char *version = getVersion();
-//            printf("EDB %s\n", version);
-//            exit(0);
-//        } else {
-//            if (argv[i][0] == '-') {
-//                fprintf(stderr,
-//                        "Unrecognized option or bad number of args for: '%s'\n",
-//                        argv[i]);
-//                exit(1);
-//            } else {
-//                /* Likely the command name, stop here. */
-//                break;
-//            }
-//        }
-//    }
-//
-//
-//    return i;
-//}
-//static void testTrace(Debugger &debugger)
-//{
-//    pid_t pid = fork();
-//    if (pid == 0) {
-//        long ret;
-//        if ((ret = ptrace(PTRACE_TRACEME, 0, NULL, NULL)) == -1)
-//            perror("trace me");
-//        else
-//            std::cout << "traeceme ret" << ret << std::endl;
-//        execl(debugger.file_name.c_str(), debugger.file_name.c_str(), NULL);
-//    } else {
-//        debugger.pid = pid;
-//
-//        std::cout << "father pid " << debugger.pid << "filename " << debugger.file_name.c_str() << std::endl;
-//
-////        sleep(20);
-//        int status;
-//        waitpid(debugger.pid, &status, 0);
-//        std::cout << "wait status " << status << std::endl;
-//    }
-//}
+static void parseOptions(int argc, char **argv) {
+
+    int i;
+    for (i = 1; i < argc; i++) {
+        int lastarg = i == argc-1;
+        if (!strcmp(argv[i], "-p") && !lastarg) {
+            config.pid = atoi(argv[++i]);
+            config.start_flag = START_PID;
+            return;
+        } else if (!strcmp(argv[i],"-h") || !strcmp(argv[i], "--version")) {
+            char *useage = getUseage();
+            printf("useage:\n%s\n", useage);
+            exit(0);
+        } else if (!strcmp(argv[i],"-v") || !strcmp(argv[i], "--version")) {
+            char *version = getVersion();
+            printf("EDB %s\n", version);
+            exit(0);
+        } else if (argv[i][0] == '-') {
+            fprintf(stderr, "Unrecognized option or bad number of args for: '%s'\n", argv[i]);
+            exit(1);
+        } else if (argv[i][0] != '-') {
+            config.file_name = argv[i];
+            config.start_flag = START_FILENAME;
+            return;
+        }
+    }
+
+    config.start_flag = STRAT_ALONE;
+}
+
+int handleCommand(Debugger &debugger, const char *input_line, int status)
+{
+    std::string s = " ";
+    std::vector<string> cmd;
+    std::string line(input_line);
+    split(line, s, cmd);
+    if (cmd[0] == "step" || cmd[0] == "s") {
+        status = debugger.stepInto();
+    } else if (cmd[0] == "finish")
+        status = debugger.stepOut();
+    else if (cmd[0] == "next")
+        debugger.run();
+    else if(cmd.size() == 2 && (cmd[0] == "b" || cmd[0] == "break")) {
+        int line_num = atoi(cmd[1].c_str());
+        if (C_OK == debugger.setBreakPointInLine(line_num))
+            printf("**set breakpoint in Line:%d**\n", line_num);
+    } else if(cmd[0] == "c" || cmd[0] == "continue") {
+        debugger.run();
+        status = debugger.waitTracee();
+    } else if ((cmd[0] == "info"|| cmd[0] == "i") && (cmd[1] == "breakpoints" || cmd[1] == "b"))
+        debugger.printBreakPointList();
+    else if (cmd.size() == 3 && (cmd[0] == "i" || cmd[0] == "info") && (cmd[1] == "registers" || cmd[1] == "r"))
+        printf("**Register %s:%ld**\n", cmd[2].c_str(), debugger.examRegister(cmd[2]));
+    else if (cmd.size() == 2 && (cmd[0] == "i" || cmd[0] == "info") && (cmd[1] == "registers" || cmd[1] == "r")) {
+        for (auto i : x64_regs_num) {
+            printf("**Register %s:%ld**\n", i.first.c_str(), debugger.examRegister(i.first.c_str()));
+        }
+    } else if (cmd[0] == "print" && cmd[1] == "memory") {
+        long address = atol(cmd[2].c_str());
+        printf("**Memory address :%ld value:%ld**\n", address, debugger.examMemory(address));
+    } else if (cmd[0] == "backtrace" || cmd[0] == "bt") {
+        debugger.backtrace();
+    } else if (cmd[0] == "set" && cmd[1] == "memory") {
+        long address = atol(cmd[2].c_str());
+        int value = atoi(cmd[3].c_str());
+        debugger.modifyMemory(address, value);
+    } else if(cmd.size() == 2 && (cmd[0] == "print" || cmd[0] == "p") ) {
+        debugger.examVariable(cmd[1]);
+    } else if(cmd[0] == "test") {
+        ;
+    } else
+        cout << "wrong command" << endl;
+    return status;
+}
 
 int main(int argc, char **argv)
 {
+    //init Debugger and set line-edit hints
+    parseOptions(argc, argv);
+    char *input_line;
+    linenoiseSetCompletionCallback(completion);
+    linenoiseSetHintsCallback(hints);
+    Debugger debugger(config);
 
-
-
-    std::cout << argv[1] << std::endl;
-    std::string file_name(argv[1]);
-//    int pid = atoi(argv[1]);
-    Debugger debugger(file_name);
-
+    //start trace
     int status = debugger.trace();
     cout << "****start trace****" << endl;
 
-    if (C_OK == debugger.setBreakPointInFunc("main")) //set bp in main func
+    //set default breakpoint in main function
+    if (C_OK == debugger.setBreakPointInFunc("main"))
         cout << "**set tempory break in main function**" << endl;
     else
         cout << "can't set tempory break in main function" << endl;
@@ -135,60 +143,18 @@ int main(int argc, char **argv)
     debugger.cancelAllBreakPoint();
     long rip = debugger.examRegister("RIP");
     debugger.modifyRegister("RIP", rip - 1);
-    while (WIFSTOPPED(status)) {
-//
-//        printf("RIP->%lx\n", debugger.examRegister("RIP"));
-        debugger.printSourceLine();
-        string line;
-        string s = " ";
-        vector<string> cmd;
-        cout << "edb>";
-        getline(cin, line);
-        split(line, s, cmd);
 
-
-        if (cmd[0] == "step") {
-            status = debugger.stepInto();
-
-        } else if (cmd[0] == "finish")
-            status = debugger.stepOut();
-        else if (cmd[0] == "next")
-            debugger.run();
-        else if(cmd[0] == "set" && cmd[1] == "breakpoint") {
-            int line_num = atoi(cmd[2].c_str());
-            if (C_OK == debugger.setBreakPointInLine(line_num))
-                printf("**set breakpoint in Line:%d**\n", line_num);
-        } else if(cmd[0] == "run") {
-            debugger.run();
-            status = debugger.waitTracee();
-        } else if (cmd[0] == "print" && cmd[1] == "breakpoint")
-            debugger.printBreakPointList();
-        else if (cmd[0] == "print" && cmd[1] == "register")
-            printf("**Register %s:%ld**\n", cmd[2].c_str(), debugger.examRegister(cmd[2]));
-        else if (cmd[0] == "print" && cmd[1] == "memory") {
-            long address = atol(cmd[2].c_str());
-            printf("**Memory address :%ld value:%ld**\n", address, debugger.examMemory(address));
-        } else if (cmd[0] == "backtrace") {
-            debugger.backtrace();
-        } else if (cmd[0] == "set" && cmd[1] == "memory") {
-            long address = atol(cmd[2].c_str());
-            int value = atoi(cmd[3].c_str());
-            debugger.modifyMemory(address, value);
-        } else if (cmd[0] == "la") {
-            debugger.printLineAddress();
-        } else if(cmd[0] == "print" && cmd[1] == "var") {
-            debugger.examVariable(cmd[2]);
-        } else if(cmd[0] == "test") {
-            ;
-        } else
-            cout << "wrong command" << endl;
-
+    // main loop
+    while (WIFSTOPPED(status) && ((input_line = linenoise("edb>")) != NULL)) {
+        status = handleCommand(debugger, input_line, status);
+        free(input_line);
         if (WIFEXITED(status))
             break;
     }
+
+    //detach tracee
     cout << "****trace is over****" << endl;
     debugger.detach();
-
 
     return 0;
 }
