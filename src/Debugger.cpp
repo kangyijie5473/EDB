@@ -92,7 +92,11 @@ Debugger::Debugger(const struct Config &c):pid(NOT_ATTACH) {
         if (fd == -1)
             perror("Open");
         else {
-            init();
+            if (C_ERR == init()) {
+                close(fd);
+                this->file_name.clear();
+                pid = NOT_ATTACH;
+            }
         }
     }
 }
@@ -106,7 +110,12 @@ Debugger::Debugger(const std::string &file_name) {
     if (fd == -1)
         perror("Open");
     else {
-        init();
+        if (C_ERR == init()) {
+            close(fd);
+            this->file_name.clear();
+            pid = NOT_ATTACH;
+        }
+
         //test();
     }
 
@@ -114,15 +123,12 @@ Debugger::Debugger(const std::string &file_name) {
 long Debugger::init() {
 //    std::cout << "init" << fd << std::endl;
     try {
-
-        elf_file = elf::elf{elf::create_mmap_loader(fd)};
-        std::shared_ptr<dwarf::loader> p = dwarf::elf::create_loader(elf_file);
-        size_t size;
-        if (p->load(dwarf::section_type::info, &size) == nullptr){
-            std::cout << "no .debug_info" << std::endl;
+        if (isDwarfFile()) {
+            elf_file = elf::elf{elf::create_mmap_loader(fd)};
+            dwarf_file = dwarf::dwarf(dwarf::elf::create_loader(elf_file));
+        } else
             return C_ERR;
-        }
-        dwarf_file = dwarf::dwarf(p);
+
     } catch (std::exception &e) {
         std::cerr << e.what() ;
     }
@@ -474,7 +480,7 @@ void Debugger::detach() {
     cancelAllBreakPoint();
     ptrace(PTRACE_DETACH, pid, NULL, NULL);
     pid = NOT_ATTACH;
-    fd = NOT_ATTACH;
+    close(fd);
     //todo:析构elf文件对象和dwarf对象
 
 }
