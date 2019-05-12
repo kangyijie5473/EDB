@@ -81,7 +81,7 @@ long Debugger::examMemory(long address) {
         return value;
 }
 
-Debugger::Debugger(const struct config &c):pid(NOT_ATTACH) {
+Debugger::Debugger(const struct Config &c):pid(NOT_ATTACH) {
     if (c.start_flag == START_PID) {
         this->pid = c.pid;
         attach(pid);
@@ -286,14 +286,17 @@ long Debugger::cancelBreakPointInFunc(std::string func_name) {
     return cancelBreakPointInLine(address_line[address]);
 }
 long Debugger::setBreakPointInStart() {
-    long main_address = getFuncAddress("main");
-    int main_line = address_line[main_address];
-    printf("SetBreakPointInStart main func address in %d Line: %lx address \n", main_line, main_address);
-
-    auto iter = line_address.find(main_line);
-    iter++;
-    printf("SetBreakPointInStart in %d Line: %lx address \n", iter->first, iter->second);
-    return setBreakPointInLine(iter->first);
+    int status;
+    setBreakPointInFunc("main");
+    run();
+    status = waitTracee();
+    cancelAllBreakPoint();
+    long rip = examRegister("RIP");
+    modifyRegister("RIP", rip - 1);
+    if(WIFSTOPPED(status))
+        return C_OK;
+    else
+        return C_ERR;
 }
 void Debugger::run() {
     checkBreakPoint();

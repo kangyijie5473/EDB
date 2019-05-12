@@ -44,7 +44,7 @@ static char *getUseage()
 {
     return const_cast<char *>("EDB -p pid\nEDB\nEDB a.out");
 }
-
+static struct Config config;
 static void parseOptions(int argc, char **argv) {
 
     int i;
@@ -74,19 +74,31 @@ static void parseOptions(int argc, char **argv) {
 
     config.start_flag = STRAT_ALONE;
 }
-
+std::vector<std::string> pre_cmd;
 int handleCommand(Debugger &debugger, const char *input_line, int status)
 {
     std::string s = " ";
     std::vector<string> cmd;
     std::string line(input_line);
     split(line, s, cmd);
+
+    //if input_line just has *\n*, exec pre command
+    if(cmd.size() == 0) {
+        if (pre_cmd.size() == 0) {
+            printf("\n");
+            return status;
+        } else {
+            cmd = pre_cmd;
+        }
+
+    }
+
     if (cmd[0] == "step" || cmd[0] == "s") {
         status = debugger.stepInto();
     } else if (cmd[0] == "finish")
         status = debugger.stepOut();
-    else if (cmd[0] == "next")
-        debugger.run();
+    else if (cmd[0] == "next" || cmd[0] == "n")
+        debugger.stepOver();
     else if(cmd.size() == 2 && (cmd[0] == "b" || cmd[0] == "break")) {
         int line_num = atoi(cmd[1].c_str());
         if (C_OK == debugger.setBreakPointInLine(line_num))
@@ -94,7 +106,7 @@ int handleCommand(Debugger &debugger, const char *input_line, int status)
     } else if(cmd[0] == "c" || cmd[0] == "continue") {
         debugger.run();
         status = debugger.waitTracee();
-    } else if ((cmd[0] == "info"|| cmd[0] == "i") && (cmd[1] == "breakpoints" || cmd[1] == "b"))
+    } else if (cmd.size() == 2 && (cmd[0] == "info"|| cmd[0] == "i") && (cmd[1] == "breakpoints" || cmd[1] == "b"))
         debugger.printBreakPointList();
     else if (cmd.size() == 3 && (cmd[0] == "i" || cmd[0] == "info") && (cmd[1] == "registers" || cmd[1] == "r"))
         printf("**Register %s:%ld**\n", cmd[2].c_str(), debugger.examRegister(cmd[2]));
@@ -114,9 +126,11 @@ int handleCommand(Debugger &debugger, const char *input_line, int status)
     } else if(cmd.size() == 2 && (cmd[0] == "print" || cmd[0] == "p") ) {
         debugger.examVariable(cmd[1]);
     } else if(cmd[0] == "test") {
-        ;
+        printf("test\n");
     } else
-        cout << "wrong command" << endl;
+        printf("**wrong command**\n");
+    // save cmd to next input *enter* only
+    pre_cmd = cmd;
     return status;
 }
 
@@ -131,21 +145,17 @@ int main(int argc, char **argv)
 
     //start trace
     int status = debugger.trace();
-    cout << "****start trace****" << endl;
+    printf("****start trace****\n");
 
     //set default breakpoint in main function
-    if (C_OK == debugger.setBreakPointInFunc("main"))
-        cout << "**set tempory break in main function**" << endl;
+    if (C_OK == debugger.setBreakPointInStart())
+        printf("**set tempory break in main function**\n");
     else
-        cout << "can't set tempory break in main function" << endl;
-    debugger.run();
-    status = debugger.waitTracee();
-    debugger.cancelAllBreakPoint();
-    long rip = debugger.examRegister("RIP");
-    debugger.modifyRegister("RIP", rip - 1);
+        cout << "**can't set tempory break in main function**\n" << endl;
+
 
     // main loop
-    while (WIFSTOPPED(status) && ((input_line = linenoise("edb>")) != NULL)) {
+    while (WIFSTOPPED(status) && ((input_line = linenoise("(edb) ")) != NULL)) {
         status = handleCommand(debugger, input_line, status);
         free(input_line);
         if (WIFEXITED(status))

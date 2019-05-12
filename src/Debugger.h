@@ -136,18 +136,17 @@ static const std::array<reg_descriptor, n_registers> g_register_descriptors {{
 const int START_PID = 1;
 const int START_FILENAME = 2;
 const int STRAT_ALONE = 3;
-static struct config {
-    int fd;          //fd
+struct Config {
     char *file_name;
     int start_flag;
     int pid;
 
-} config;
+} ;
 class Debugger {
 public:
     Debugger(int pid);
     Debugger(const std::string &file_name);
-    Debugger(const struct config &c);
+    Debugger(const struct Config &c);
     Debugger() = default;
 
     long examVariable(const std::string &name);
