@@ -23,6 +23,7 @@
 #include <libunwind-x86_64.h>
 #include <libunwind-ptrace.h>
 #include <set>
+#include <fstream>
 
 
 class Debugger;
@@ -193,6 +194,7 @@ private:
     std::vector<std::pair<int, char>> breakpoint_list;
     std::set<long> line_address_set;
     std::map<long, int> address_line;
+    std::vector<std::string> code_line;
 };
 
 

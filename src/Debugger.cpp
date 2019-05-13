@@ -123,12 +123,14 @@ Debugger::Debugger(const std::string &file_name) {
 long Debugger::init() {
 //    std::cout << "init" << fd << std::endl;
     try {
-        if (isDwarfFile()) {
-            elf_file = elf::elf{elf::create_mmap_loader(fd)};
-            dwarf_file = dwarf::dwarf(dwarf::elf::create_loader(elf_file));
-        } else
+        elf_file = elf::elf{elf::create_mmap_loader(fd)};
+        std::shared_ptr<dwarf::loader> p = dwarf::elf::create_loader(elf_file);
+        size_t size;
+        if (p->load(dwarf::section_type::info, &size) == nullptr) {
+            printf("no .debug_info. please add *-g* flag in compile\n");
             return C_ERR;
-
+        } else
+            dwarf_file = dwarf::dwarf(p);
     } catch (std::exception &e) {
         std::cerr << e.what() ;
     }
@@ -141,6 +143,15 @@ long Debugger::init() {
             address_line.insert(std::make_pair(line.address, line.line));
             line_address_set.insert(line.address);
         }
+    }
+
+    std::fstream fs;
+    fs.open(file_name + ".c", fs.in);
+    code_line.push_back(file_name);
+    while (!fs.eof()) {
+        std::string temp;
+        std::getline(fs, temp);
+        code_line.push_back(temp);
     }
 
     return C_OK;
@@ -513,7 +524,7 @@ void Debugger::printLineAddress() {
 void Debugger::printSourceLine() {
     long rip = examRegister("RIP");
     if (line_address_set.find(rip) != line_address_set.end())
-        printf("now in NO.%d line\n", address_line[rip]);
+        printf("<%d>  %s\n", address_line[rip], code_line[address_line[rip]].c_str());
     else
         printf("RIP:%lx\n", rip);
 }

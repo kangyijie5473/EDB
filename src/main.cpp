@@ -151,12 +151,13 @@ int main(int argc, char **argv)
     if (C_OK == debugger.setBreakPointInStart())
         printf("**set tempory break in main function**\n");
     else
-        cout << "**can't set tempory break in main function**\n" << endl;
-
+        printf("**can't set tempory break in main function**\n");
+    debugger.printSourceLine();
 
     // main loop
     while (WIFSTOPPED(status) && ((input_line = linenoise("(edb) ")) != NULL)) {
         status = handleCommand(debugger, input_line, status);
+        debugger.printSourceLine();
         free(input_line);
         if (WIFEXITED(status))
             break;
