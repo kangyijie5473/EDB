@@ -8,11 +8,12 @@
 Watcher::Watcher():pid(NOT_ATTACH) {
 
 }
-Watcher::Watcher(int pid) :pid(NOT_ATTACH){
-    if (C_ERR == attach(pid))
+Watcher::Watcher(pid_t pid) :pid(NOT_ATTACH){
+    if (C_ERR == attach(pid)){
         this->pid = NOT_ATTACH;
+    }
 }
-int Watcher::attach(int pid) {
+int Watcher::attach(pid_t pid) {
     if (this->pid != NOT_ATTACH) {
         return C_ERR;
     }
@@ -58,16 +59,23 @@ void Watcher::getOpenFd() {
 }
 void Watcher::getArgs() {
     std::string cmdline = file_path + "/cmdline";
-    int fd = open(cmdline.c_str(), O_RDONLY);
-    char buffer[100] = {0};
-    int n = read(fd, buffer, 100);
-    if (n == -1) {
-        perror("read ");
-        close(fd);
-        return;
+    std::fstream fs;
+    fs.open(cmdline, fs.in);
+    std::string buffer;
+    std::getline(fs, buffer);
+    printf("argv[0]:");
+
+    for (int i = 0, j = 0; i < buffer.size(); i++) {
+        if(buffer[i] == '\0' && i != buffer.size() - 1) {
+            j++;
+            printf("\nargv[%d]:", j);
+        }
+        printf("%c", buffer[i]);
+
     }
-    printf("args is %s\n", buffer);
-    close(fd);
+    printf("\n");
+    //printf("args is %s len %d\n", buffer.c_str(), buffer.size());
+    fs.close();
 }
 void Watcher::getCwd() {
     std::string cwd = file_path + "/cwd";
@@ -95,7 +103,7 @@ void Watcher::getIoInfo() {
     fs.open(io_file, fs.in);
     fs >> buffer >> read_char >> buffer >> write_char >> buffer
        >> syscall_read_char >> buffer >> syscall_write_char >> buffer >> real_read >> buffer >> real_write >> buffer >> cancelled_write;
-    printf("read %ld bytes from storage, write %ld bytes from storage", real_read, real_write);
+    printf("read %ld bytes from storage, write %ld bytes from storage\n", real_read, real_write);
     fs.close();
 }
 
@@ -107,14 +115,16 @@ void Watcher::getThreadsID() {
         return;
     }
     struct dirent *dp;
+    printf("threadIDs: ");
     while (true) {
         dp = readdir(dir);
         if (dp == NULL)
             break ;
         if (strcmp(dp->d_name, ".") == 0 || strcmp(dp->d_name, "..") == 0)
             continue;
-        printf("%s", dp->d_name);
+        printf("%s ", dp->d_name);
     }
+    printf("\n");
     closedir(dir);
 }
 void Watcher::getStackHeapAddress() {
