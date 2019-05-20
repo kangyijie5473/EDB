@@ -26,9 +26,9 @@ static std::string getString(int n)
 class Watcher {
 public:
     Watcher();
-    explicit Watcher(int pid);
+    explicit Watcher(pid_t pid);
     void getOpenFd();
-    int attach(int pid);
+    int attach(pid_t pid);
     void detach();
     void getStackHeapAddress();
     void getCwd();
