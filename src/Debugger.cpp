@@ -20,8 +20,9 @@ static std::string toHexString(const std::string &str)
 }
 static std::string toHexString(long value)
 {
-    std::string result;
-    return result;
+    std::stringstream result;
+    result << "0x" << std::hex << value;
+    return result.str();
 }
 
 static std::string getString(int n)
@@ -308,8 +309,8 @@ long Debugger::setBreakPointInStart() {
     run();
     status = waitTracee();
     cancelAllBreakPoint();
-    long rip = examRegister("RIP");
-    modifyRegister("RIP", rip - 1);
+    //long rip = examRegister("RIP");
+    //modifyRegister("RIP", rip - 1);
     if(WIFSTOPPED(status))
         return C_OK;
     else
@@ -324,6 +325,8 @@ int Debugger::waitTracee() {
     waitpid(pid, &status, 0);
     return status;
 }
+
+extern void showCallChain(const std::vector<Frame> &frames);
 void Debugger::backtrace() {
     //todo:目前没有验证没有-g时能否正常打印
     struct UPT_info *ui;
@@ -352,19 +355,32 @@ void Debugger::backtrace() {
             printf("unw_init_remote: UNKNOWN");
         }
     }
+    std::vector<Frame> frames;
     do {
-        unw_word_t  offset, pc;
-        char        fname[64];
-
+        Frame frame;
+        unw_word_t pc;
         unw_get_reg(&c, UNW_REG_IP, &pc);
-        fname[0] = '\0';
-        (void) unw_get_proc_name(&c, fname, sizeof(fname), &offset);
-        printf("%p : (%s+0x%x) [%p]\n", (void *)pc,
-               fname,
-               (int) offset,
-               (void *) pc);
+        char buf[64]; //Stupid ! Because I dont know how to convert *frame.name*
+        (void) unw_get_proc_name(&c, buf, sizeof(buf), &frame.offset);
+
+        strcpy(frame.name, buf);
+        strcpy(frame.pc, toHexString(pc).c_str());
+        frames.push_back(frame);
+        if(strcmp("main", buf) == 0)
+            break;
     } while (unw_step(&c) > 0);
 
+    long rbp = examRegister("RBP");
+    long rsp = examRegister("RSP");
+    for (int i = 0;  i < frames.size(); i++) {
+        strcpy(frames[i].rbp, toHexString(rbp).c_str());
+        strcpy(frames[i].rsp, toHexString(rsp).c_str());
+        rsp = rbp + 8;
+        rbp = examMemory(rbp);
+    }
+    std::reverse(frames.begin(), frames.end());
+
+    showCallChain(frames);
 
     _UPT_destroy(ui);
 }
@@ -477,6 +493,7 @@ long Debugger::examVariable(const std::string &name) {
 }
 
 void Debugger::cancelAllBreakPoint() {
+    checkBreakPoint();
     for (auto i : breakpoint_list) {
         long now_ins = ptrace(PTRACE_PEEKTEXT, pid, line_address[i.first], NULL);
         if (*(char *)&now_ins == INT_ins)
@@ -526,7 +543,8 @@ void Debugger::printSourceLine() {
     if (line_address_set.find(rip) != line_address_set.end())
         printf("<%d>  %s\n", address_line[rip], code_line[address_line[rip]].c_str());
     else
-        printf("RIP:%lx\n", rip);
+        ;
+        //printf("RIP:%lx\n", rip);
 }
 void Debugger::printBreakPointList() {
     for(auto &i : breakpoint_list) {
@@ -535,6 +553,9 @@ void Debugger::printBreakPointList() {
     //    for (auto &i : line_address_set)
     //        printf("line_address set : %lx\n", i);
 
+}
+pid_t Debugger::getTracePid() {
+    return pid;
 }
 bool Debugger::isDwarfFile() {
     elf::elf elf_file = elf::elf(elf::create_mmap_loader(fd));
