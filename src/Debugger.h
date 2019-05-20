@@ -180,6 +180,7 @@ public:
     //test
     bool isDwarfFile();
     void printBreakPointList();
+    pid_t getTracePid();
 
 private:
     long init();
