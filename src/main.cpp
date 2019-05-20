@@ -75,7 +75,7 @@ static void parseOptions(int argc, char **argv) {
     config.start_flag = STRAT_ALONE;
 }
 std::vector<std::string> pre_cmd;
-int handleCommand(Debugger &debugger, const char *input_line, int status)
+int handleCommand(Debugger &debugger, Watcher &watcher, const char *input_line, int status)
 {
     std::string s = " ";
     std::vector<string> cmd;
@@ -123,10 +123,26 @@ int handleCommand(Debugger &debugger, const char *input_line, int status)
         long address = atol(cmd[2].c_str());
         int value = atoi(cmd[3].c_str());
         debugger.modifyMemory(address, value);
-    } else if(cmd.size() == 2 && (cmd[0] == "print" || cmd[0] == "p") ) {
+    } else if (cmd.size() == 2 && (cmd[0] == "print" || cmd[0] == "p") ) {
         debugger.examVariable(cmd[1]);
-    } else if(cmd[0] == "test") {
-        printf("test\n");
+    } else if (cmd.size() == 4 && (cmd[0] == "set") && cmd[1] == "register") {
+        debugger.modifyRegister(cmd[2], atol(cmd[3].c_str()));
+    } else if (cmd.size() == 1 && cmd[0] == "usedMemory") {
+        watcher.getUsedMem();
+    } else if (cmd.size() == 1 && cmd[0] == "openFd") {
+        watcher.getOpenFd();
+    } else if (cmd.size() == 1 && cmd[0] == "cwd") {
+        watcher.getCwd();
+    } else if (cmd.size() == 1 && (cmd[0] == "stack" || cmd[0] == "heap")) {
+        watcher.getStackHeapAddress();
+    } else if (cmd.size() == 1 && cmd[0] == "args") {
+        watcher.getArgs();
+    } else if (cmd.size() == 1 && cmd[0] == "io") {
+        watcher.getIoInfo();
+    } else if (cmd.size() == 1 && cmd[0] == "pid") {
+        printf("trace process %d\n", debugger.getTracePid());
+    } else if(cmd[0] == "quit") {
+        status = 5473;
     } else
         printf("**wrong command**\n");
     // save cmd to next input *enter* only
@@ -145,21 +161,25 @@ int main(int argc, char **argv)
 
     //start trace
     int status = debugger.trace();
+    Watcher watcher(debugger.getTracePid());
     printf("****start trace****\n");
 
     //set default breakpoint in main function
-    if (C_OK == debugger.setBreakPointInStart())
-        printf("**set tempory break in main function**\n");
-    else
-        printf("**can't set tempory break in main function**\n");
+    if (config.start_flag == START_FILENAME) {
+        if (C_OK == debugger.setBreakPointInStart())
+            printf("**set tempory break in main function**\n");
+        else
+            printf("**can't set tempory break in main function**\n");
+    }
+
     debugger.printSourceLine();
 
     // main loop
-    while (WIFSTOPPED(status) && ((input_line = linenoise("(edb) ")) != NULL)) {
-        status = handleCommand(debugger, input_line, status);
+    while (((input_line = linenoise("(edb) ")) != NULL)) {
+        status = handleCommand(debugger, watcher, input_line, status);
         debugger.printSourceLine();
         free(input_line);
-        if (WIFEXITED(status))
+        if ( status == 5473)
             break;
     }
 
