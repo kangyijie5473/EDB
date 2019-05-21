@@ -6,6 +6,8 @@
 #define SRC_COMMON_H
 
 #include <cstdint>
+#include <string>
+#include <sstream>
 
 const int C_OK = 0;
 const int C_ERR = -1;
@@ -18,4 +20,11 @@ struct Frame {
     char rbp[19]; // "0x123456789abcdefg\0"
     char rsp[19];
 };
+template <typename T>
+std::string getString(T n)
+{
+    std::stringstream newstr;
+    newstr << n;
+    return newstr.str();
+}
 #endif //SRC_COMMON_H

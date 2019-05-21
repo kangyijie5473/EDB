@@ -4,6 +4,21 @@
 
 #include "common.h"
 #include "Debugger.h"
+static std::string toDecString(const std::string &str)
+{
+    unsigned long value = 0;
+    unsigned long power = 1;
+    for (int i = str.size() -1; i >= 2; i--) {
+        if (str[i] >= '0' && str[i] <= '9')
+            value += power * (str[i] - '0');
+        else {
+            value += power * (str[i] - 'a' + 10);
+        }
+        power *= 16;
+    }
+    return getString(value);
+
+}
 static std::string toUpper(const std::string &str)
 {
     std::string res;
@@ -25,12 +40,6 @@ static std::string toHexString(long value)
     return result.str();
 }
 
-static std::string getString(int n)
-{
-    std::stringstream newstr;
-    newstr << n;
-    return newstr.str();
-}
 
 long Debugger::examRegister(const std::string &reg) {
     std::string reg_name = toUpper(reg);
@@ -48,6 +57,19 @@ long Debugger::modifyRegister(std::string reg, long value) {
     }
     else
         return C_OK;
+}
+long Debugger::modifyMemory(const std::string &address, const std::string &value) {
+    long addr = 0;
+    long v = 0;
+    if (address[0] != '0')
+        addr = atol(address.c_str());
+    else
+        addr = atol(toDecString(address).c_str());
+    if (value[0] != '0')
+        v = atoi(value.c_str());
+    else
+        v = atol(toDecString(value).c_str());
+    modifyMemory(addr, v);
 }
 long Debugger::modifyMemory(long address, long value) {
     long ret = ptrace(PTRACE_POKETEXT, pid, address, value);
@@ -72,6 +94,15 @@ std::vector<long> Debugger::examMemory(long address, long size) {
     }
     return mem;
 
+}
+long Debugger::examMemory(const std::string &address) {
+    long value;
+    if (address[0] != '0')
+        value = examMemory(atol(address.c_str()));
+    else
+        value = examMemory(atol(toDecString(address).c_str()));
+    printf("address : %s value : %s", address.c_str(), toHexString(value).c_str());
+    return value;
 }
 long Debugger::examMemory(long address) {
     long value = ptrace(PTRACE_PEEKTEXT, pid, address, NULL);

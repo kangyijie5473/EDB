@@ -154,8 +154,8 @@ public:
     long modifyVariable(const std::string &name, long value);
     std::vector<long> examMemory(long address, long size);
 
-    long examMemory(long address);
-    long modifyMemory(long address, long value);
+    long examMemory(const std::string &address);
+    long modifyMemory(const std::string &address, const std::string &value);
     long setBreakPointInLine(int line_num);
     long cancelBreakPointInLine(int line_num);
     long setBreakPointInFunc(std::string func_name);
@@ -186,6 +186,9 @@ private:
     long init();
     long getFuncAddress(std::string func_name);
     void checkBreakPoint();
+    long modifyMemory(long address, long value);
+    long examMemory(long address);
+
     pid_t pid;
     std::string file_name;
     int fd;

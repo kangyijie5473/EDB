@@ -114,15 +114,12 @@ int handleCommand(Debugger &debugger, Watcher &watcher, const char *input_line, 
         for (auto i : x64_regs_num) {
             printf("**Register %s:%ld**\n", i.first.c_str(), debugger.examRegister(i.first.c_str()));
         }
-    } else if (cmd[0] == "print" && cmd[1] == "memory") {
-        long address = atol(cmd[2].c_str());
-        printf("**Memory address :%ld value:%ld**\n", address, debugger.examMemory(address));
+    } else if (cmd.size() == 3 && cmd[0] == "print" && cmd[1] == "memory") {
+        debugger.examMemory(cmd[2]);
     } else if (cmd[0] == "backtrace" || cmd[0] == "bt") {
         debugger.backtrace();
     } else if (cmd[0] == "set" && cmd[1] == "memory") {
-        long address = atol(cmd[2].c_str());
-        int value = atoi(cmd[3].c_str());
-        debugger.modifyMemory(address, value);
+        debugger.modifyMemory(cmd[2], cmd[3]);
     } else if (cmd.size() == 2 && (cmd[0] == "print" || cmd[0] == "p") ) {
         debugger.examVariable(cmd[1]);
     } else if (cmd.size() == 4 && (cmd[0] == "set") && cmd[1] == "register") {
