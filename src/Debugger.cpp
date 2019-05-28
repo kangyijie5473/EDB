@@ -177,6 +177,7 @@ long Debugger::init() {
         }
     }
 
+    //todo:被调试的程序名需要与源代码相同
     std::fstream fs;
     fs.open(file_name + ".c", fs.in);
     code_line.push_back(file_name);
@@ -408,7 +409,9 @@ void Debugger::backtrace() {
         strcpy(frames[i].rsp, toHexString(rsp).c_str());
         rsp = rbp + 8;
         rbp = examMemory(rbp);
+        printf("%s[%s + 0x%lx] <- ", frames[i].name, frames[i].name, frames[i].offset);
     }
+    printf("Process start\n");
     std::reverse(frames.begin(), frames.end());
 
     showCallChain(frames);
