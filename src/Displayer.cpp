@@ -84,15 +84,18 @@ void showCallChain(const std::vector<Frame> &frames)
         i++;
         if (j == frames.size() - 1) {
             frame_table.content[i][1] = "RSP";
-            frame_table.content[i][2] = const_cast<char *>(frames[j].rsp);
-            frame_table.content[i][3] = "****";
+            if (strcmp(frames[j].rsp,frames[j].rbp) == 0)
+                frame_table.content[i][3] = const_cast<char *>(frames[j - 1].rbp);
+            else
+                frame_table.content[i][3] = "****";
         } else {
             frame_table.content[i][1] = "RIP";
-            frame_table.content[i][2] = const_cast<char *>(frames[j].rsp);
             frame_table.content[i][3] = const_cast<char *>(frames[j].pc);
 
         }
         frame_table.content[i][0] = " ";
+        frame_table.content[i][2] = const_cast<char *>(frames[j].rsp);
+
     }
     char formated_out[4096] = {0};
     //

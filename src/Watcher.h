@@ -15,14 +15,10 @@
 #include <sstream>
 #include <fstream>
 #include <vector>
+#include "common.h"
 
 
-static std::string getString(int n)
-{
-    std::stringstream newstr;
-    newstr << n;
-    return newstr.str();
-}
+
 class Watcher {
 public:
     Watcher();

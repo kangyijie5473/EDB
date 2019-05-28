@@ -103,7 +103,7 @@ void Watcher::getIoInfo() {
     fs.open(io_file, fs.in);
     fs >> buffer >> read_char >> buffer >> write_char >> buffer
        >> syscall_read_char >> buffer >> syscall_write_char >> buffer >> real_read >> buffer >> real_write >> buffer >> cancelled_write;
-    printf("read %ld bytes from storage, write %ld bytes from storage\n", real_read, real_write);
+    printf("read %ld bytes from storage, write %ld bytes to storage\n", real_read, real_write);
     fs.close();
 }
 
